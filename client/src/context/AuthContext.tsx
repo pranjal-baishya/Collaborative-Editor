@@ -4,6 +4,7 @@ import axios from 'axios';
 interface User {
   id: string;
   username: string;
+  avatarColor?: string;
 }
 
 interface AuthContextType {

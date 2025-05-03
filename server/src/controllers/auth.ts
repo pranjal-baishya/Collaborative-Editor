@@ -1,38 +1,28 @@
 import { Request, Response } from 'express';
-import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-
-// In a real app, you would use a database
-// This is a simple in-memory user store for demonstration
-const users: { id: string; username: string; password: string }[] = [];
+import User from '../models/User';
 
 export const register = async (req: Request, res: Response) => {
   try {
     const { username, password } = req.body;
 
     // Check if username already exists
-    const existingUser = users.find(user => user.username === username);
+    const existingUser = await User.findOne({ username });
     if (existingUser) {
       return res.status(400).json({ message: 'Username already exists' });
     }
 
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    // Create new user
-    const userId = Date.now().toString();
-    const newUser = {
-      id: userId,
+    // Create new user - password hashing happens in the User model's pre-save hook
+    const newUser = new User({
       username,
-      password: hashedPassword
-    };
+      password
+    });
 
-    users.push(newUser);
+    const savedUser = await newUser.save();
 
     // Generate JWT
     const token = jwt.sign(
-      { id: userId, username },
+      { id: savedUser._id, username },
       process.env.JWT_SECRET || 'secret',
       { expiresIn: '1h' }
     );
@@ -40,7 +30,11 @@ export const register = async (req: Request, res: Response) => {
     res.status(201).json({
       message: 'User registered successfully',
       token,
-      user: { id: userId, username }
+      user: {
+        id: savedUser._id,
+        username: savedUser.username,
+        avatarColor: savedUser.avatarColor
+      }
     });
   } catch (error) {
     console.error('Registration error:', error);
@@ -53,20 +47,20 @@ export const login = async (req: Request, res: Response) => {
     const { username, password } = req.body;
 
     // Find user
-    const user = users.find(user => user.username === username);
+    const user = await User.findOne({ username });
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
     // Check password
-    const isMatch = await bcrypt.compare(password, user.password);
+    const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
     // Generate JWT
     const token = jwt.sign(
-      { id: user.id, username },
+      { id: user._id, username },
       process.env.JWT_SECRET || 'secret',
       { expiresIn: '1h' }
     );
@@ -74,10 +68,36 @@ export const login = async (req: Request, res: Response) => {
     res.json({
       message: 'Login successful',
       token,
-      user: { id: user.id, username }
+      user: {
+        id: user._id,
+        username: user.username,
+        avatarColor: user.avatarColor
+      }
     });
   } catch (error) {
     console.error('Login error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Get current user info
+export const getCurrentUser = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    
+    if (!userId) {
+      return res.status(401).json({ message: 'Not authenticated' });
+    }
+    
+    const user = await User.findById(userId).select('-password');
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    res.json({ user });
+  } catch (error) {
+    console.error('Get current user error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 }; 
