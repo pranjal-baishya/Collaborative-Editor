@@ -1,7 +1,10 @@
 .user-cursor {
   position: absolute;
   z-index: 100;
-  pointer-events: none; /* Allow clicking through the cursor */
+  pointer-events: none;
+  top: 0;
+  left: 0;
+  will-change: transform;
 }
 
 .cursor-pointer {
@@ -10,6 +13,12 @@
   position: absolute;
   top: 0;
   left: 0;
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
 }
 
 .cursor-name {
@@ -22,4 +31,5 @@
   font-size: 12px;
   white-space: nowrap;
   opacity: 0.9;
+  transform: translateX(-50%);
 } 

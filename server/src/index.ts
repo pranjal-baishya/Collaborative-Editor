@@ -51,6 +51,7 @@ interface DocumentSession {
     };
     avatarColor?: string;
   }[];
+  content: string; // Store the current document content
 }
 
 const documentSessions: Record<string, DocumentSession> = {};
@@ -82,7 +83,7 @@ io.on('connection', (socket) => {
     socket.join(documentId);
     
     if (!documentSessions[documentId]) {
-      documentSessions[documentId] = { users: [] };
+      documentSessions[documentId] = { users: [], content: '' };
     }
     
     // Check if user already exists in the document to prevent duplicates
@@ -112,12 +113,19 @@ io.on('connection', (socket) => {
     // Send current users in the document to the newly joined user
     io.to(socket.id).emit('document-users', documentSessions[documentId].users);
     
+    // Send current document content to the newly joined user
+    io.to(socket.id).emit('load-document', documentSessions[documentId].content);
+    
     // Log current state for debugging
     console.log(`Document ${documentId} now has ${documentSessions[documentId].users.length} users`);
   });
 
   // Handle content changes
   socket.on('send-changes', (documentId: string, changes: any) => {
+    // Store the updated content
+    if (documentSessions[documentId]) {
+      documentSessions[documentId].content = changes;
+    }
     socket.to(documentId).emit('receive-changes', changes);
   });
   

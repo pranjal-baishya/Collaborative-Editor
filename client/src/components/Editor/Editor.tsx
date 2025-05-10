@@ -48,20 +48,29 @@ const Editor: React.FC = () => {
     const textarea = textareaRef.current;
     if (!textarea) return null;
     
-    // This is a simplified approach. In a real implementation,
-    // you would need more complex calculations based on the specific editor used.
-    const text = textarea.value;
-    const lines = text.split('\n');
+    // Get a more accurate measurement of text dimensions
+    const computedStyle = window.getComputedStyle(textarea);
+    const lineHeight = parseInt(computedStyle.lineHeight) || 20;
+    const fontFamily = computedStyle.fontFamily;
+    const fontSize = parseInt(computedStyle.fontSize) || 16;
     
-    // Get line height (approximate)
-    const lineHeight = 20; // pixels
+    // Create a temporary span to measure character width more accurately
+    const tempSpan = document.createElement('span');
+    tempSpan.style.font = `${fontSize}px ${fontFamily}`;
+    tempSpan.style.visibility = 'hidden';
+    tempSpan.style.position = 'absolute';
+    tempSpan.innerText = 'X'; // Use a representative character
+    document.body.appendChild(tempSpan);
+    const charWidth = tempSpan.getBoundingClientRect().width;
+    document.body.removeChild(tempSpan);
     
-    // Get character width (approximate)
-    const charWidth = 8; // pixels
+    // Get textarea's padding
+    const paddingTop = parseInt(computedStyle.paddingTop) || 0;
+    const paddingLeft = parseInt(computedStyle.paddingLeft) || 0;
     
-    // Calculate position
-    const top = line * lineHeight;
-    const left = ch * charWidth;
+    // Calculate position with padding offset
+    const top = (line * lineHeight) + paddingTop;
+    const left = (ch * charWidth) + paddingLeft;
     
     return { top, left };
   }, []);
@@ -92,7 +101,7 @@ const Editor: React.FC = () => {
       socket.emit('join-document', documentId, {
         userId: user.id,
         username: user.username,
-        avatarColor: user.avatarColor || '#4285f4'
+        avatarColor: user.avatarColor ?? '#4285f4'
       });
     });
     
@@ -105,6 +114,12 @@ const Editor: React.FC = () => {
     socket.on('connect_error', (error) => {
       console.error('Connection error:', error);
       setConnected(false);
+    });
+    
+    // Handle receiving initial document content on join
+    socket.on('load-document', (documentContent: string) => {
+      console.log('Received initial document content');
+      setContent(documentContent);
     });
     
     // Handle receiving content changes
@@ -175,14 +190,22 @@ const Editor: React.FC = () => {
     const textarea = textareaRef.current;
     const { selectionStart } = textarea;
     
-    // Convert selection index to line and character
-    const text = textarea.value.substring(0, selectionStart);
-    const lines = text.split('\n');
-    const line = lines.length - 1;
-    const ch = lines[lines.length - 1].length;
+    // Convert selection index to line and character more accurately
+    const text = textarea.value;
+    const textBeforeCursor = text.substring(0, selectionStart);
+    
+    // Count lines before cursor (number of newlines + 1)
+    const linesBeforeCursor = textBeforeCursor.split('\n');
+    const lineIndex = linesBeforeCursor.length - 1;
+    
+    // The character position is the length of the last line
+    const characterIndex = linesBeforeCursor[lineIndex].length;
     
     // Send cursor position to server
-    socketRef.current.emit('cursor-position', documentId, { line, ch }, user.id);
+    socketRef.current.emit('cursor-position', documentId, { 
+      line: lineIndex, 
+      ch: characterIndex 
+    }, user.id);
   }, [documentId, user]);
   
   // Handle text selection or cursor movement

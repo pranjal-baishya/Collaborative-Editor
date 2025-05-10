@@ -1,5 +1,4 @@
 import React from 'react';
-import Avatar from '../User/Avatar';
 import './UserCursor.css';
 
 interface UserCursorProps {
@@ -16,8 +15,8 @@ const UserCursor: React.FC<UserCursorProps> = ({ username, position, color }) =>
     <div 
       className="user-cursor"
       style={{ 
-        left: `${position.left}px`, 
-        top: `${position.top}px`
+        transform: `translate(${position.left}px, ${position.top}px)`,
+        // Using transform instead of left/top for better performance
       }}
     >
       <div className="cursor-pointer" style={{ backgroundColor: color }}></div>
